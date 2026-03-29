@@ -1,0 +1,44 @@
+{
+  "clock": {
+    "freqMHz": 30,
+    "duty": 50,
+    "jitter": 1,
+    "rise": 10,
+    "fall": 10,
+    "pattern": ""
+  },
+  "signals": [
+    {
+      "id": "s1",
+      "name": "CS#",
+      "direction": "TX",
+      "rxClockFlight": 0,
+      "tx": {
+        "launchEdge": "FALLING",
+        "tco": 0,
+        "jitter": 0,
+        "rise": 10,
+        "fall": 10
+      },
+      "path": [
+        {
+          "id": "path_1774774357720",
+          "type": "XCVR",
+          "name": "Buffer",
+          "tpd": 0,
+          "jitter": 0,
+          "skew": 3
+        }
+      ],
+      "rx": {
+        "captureEdge": "RISING",
+        "setup": 2,
+        "hold": 2
+      },
+      "pattern": "0101"
+    }
+  ],
+  "safetyMargin": 6,
+  "freqUnit": "MHz",
+  "timeUnit": "ns"
+}

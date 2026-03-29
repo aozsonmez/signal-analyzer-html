@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Hardware Timing Analyzer</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel to compile JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans m-0 p-0 overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // --- Inline Icons ---
+        const Activity = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
+        const ClockIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
+        const AlertTriangle = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>;
+        const CheckCircle2 = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>;
+        const Info = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>;
+        const Trash2 = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>;
+        const ArrowRight = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>;
+        const ArrowLeft = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>;
+        const ArrowDown = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>;
+        const Cpu = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>;
+        const Zap = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
+        const Copy = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>;
+        const Download = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>;
+        const Upload = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>;
+        const Save = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>;
+
+        // --- Hardware Presets ---
+        const PRESETS = {
+            'SPI (25MHz)': {
+                clock: { freqMHz: 25, duty: 50, jitter: 0.5, rise: 1.0, fall: 1.0, pattern: '' },
+                signals: [
+                    { id: 's1', name: 'CS#', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 4.0, jitter: 0.5, rise: 1.0, fall: 1.0 }, path: [], rx: { captureEdge: 'RISING', setup: 2.0, hold: 2.0 }, pattern: '10.......' },
+                    { id: 's2', name: 'MOSI', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 4.0, jitter: 0.5, rise: 1.0, fall: 1.0 }, path: [], rx: { captureEdge: 'RISING', setup: 2.0, hold: 2.0 }, pattern: 'x10101010x' },
+                    { id: 's3', name: 'MISO', direction: 'RX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 4.0, jitter: 0.5, rise: 1.0, fall: 1.0 }, path: [], rx: { captureEdge: 'RISING', setup: 2.0, hold: 2.0 }, pattern: 'x01010101x' }
+                ]
+            },
+            'QSPI (100MHz)': {
+                clock: { freqMHz: 100, duty: 50, jitter: 0.2, rise: 0.5, fall: 0.5, pattern: '' },
+                signals: [
+                    { id: 's1', name: 'CS#', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 2.0, jitter: 0.2, rise: 0.5, fall: 0.5 }, path: [], rx: { captureEdge: 'RISING', setup: 1.5, hold: 1.0 }, pattern: '10.......' },
+                    { id: 's2', name: 'IO0', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 2.0, jitter: 0.2, rise: 0.5, fall: 0.5 }, path: [], rx: { captureEdge: 'RISING', setup: 1.5, hold: 1.0 }, pattern: 'x10101010x' },
+                    { id: 's3', name: 'IO1', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 2.0, jitter: 0.2, rise: 0.5, fall: 0.5 }, path: [], rx: { captureEdge: 'RISING', setup: 1.5, hold: 1.0 }, pattern: 'x01010101x' },
+                    { id: 's4', name: 'IO2', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 2.0, jitter: 0.2, rise: 0.5, fall: 0.5 }, path: [], rx: { captureEdge: 'RISING', setup: 1.5, hold: 1.0 }, pattern: 'x11001100x' },
+                    { id: 's5', name: 'IO3', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'RISING', tco: 2.0, jitter: 0.2, rise: 0.5, fall: 0.5 }, path: [], rx: { captureEdge: 'RISING', setup: 1.5, hold: 1.0 }, pattern: 'x00110011x' }
+                ]
+            },
+            'Octal SPI (200MHz)': {
+                clock: { freqMHz: 200, duty: 50, jitter: 0.1, rise: 0.2, fall: 0.2, pattern: '' },
+                signals: [
+                    { id: 's1', name: 'CS#', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'BOTH', tco: 1.0, jitter: 0.1, rise: 0.2, fall: 0.2 }, path: [], rx: { captureEdge: 'BOTH', setup: 0.8, hold: 0.8 }, pattern: '10...............' },
+                    ...Array.from({length: 8}, (_, i) => ({
+                        id: `s${i+2}`, name: `IO${i}`, direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'BOTH', tco: 1.0, jitter: 0.1, rise: 0.2, fall: 0.2 }, path: [], rx: { captureEdge: 'BOTH', setup: 0.8, hold: 0.8 }, pattern: 'xx10101010101010xx'
+                    }))
+                ]
+            },
+            'I2C (400kHz)': {
+                clock: { freqMHz: 0.4, duty: 50, jitter: 10.0, rise: 100.0, fall: 100.0, pattern: '' },
+                signals: [
+                    { id: 's1', name: 'SDA', direction: 'TX', rxClockFlight: 0, tx: { launchEdge: 'FALLING', tco: 150.0, jitter: 10.0, rise: 100.0, fall: 100.0 }, path: [], rx: { captureEdge: 'RISING', setup: 100.0, hold: 0.0 }, pattern: 'z1010.1.0z' }
+                ]
+            }
+        };
+
+        // --- Core Application ---
+        function App() {
+          const [clock, setClock] = useState(PRESETS['SPI (25MHz)'].clock);
+          const [signals, setSignals] = useState(PRESETS['SPI (25MHz)'].signals);
+
+          const [safetyMargin, setSafetyMargin] = useState(10);
+          
+          // --- Unit Configuration State ---
+          const [freqUnit, setFreqUnit] = useState('MHz');
+          const [timeUnit, setTimeUnit] = useState('ns');
+          
+          const fMult = freqUnit === 'kHz' ? 1000 : 1;
+          const tMult = timeUnit === 'us' ? 0.001 : 1;
+
+          const loadPreset = (key) => {
+              if (PRESETS[key]) {
+                  setClock(JSON.parse(JSON.stringify(PRESETS[key].clock)));
+                  setSignals(JSON.parse(JSON.stringify(PRESETS[key].signals)));
+              }
+          };
+
+          // --- Import / Export Handlers ---
+          const exportConfig = () => {
+              const config = { clock, signals, safetyMargin, freqUnit, timeUnit };
+              const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+              const downloadAnchorNode = document.createElement('a');
+              downloadAnchorNode.setAttribute("href", dataStr);
+              downloadAnchorNode.setAttribute("download", "signal_analyzer_config.json");
+              document.body.appendChild(downloadAnchorNode);
+              downloadAnchorNode.click();
+              downloadAnchorNode.remove();
+          };
+
+          const importConfig = (event) => {
+              const file = event.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  try {
+                      const config = JSON.parse(e.target.result);
+                      if (config.clock) setClock(config.clock);
+                      if (config.signals) setSignals(config.signals);
+                      if (config.safetyMargin !== undefined) setSafetyMargin(config.safetyMargin);
+                      if (config.freqUnit) setFreqUnit(config.freqUnit);
+                      if (config.timeUnit) setTimeUnit(config.timeUnit);
+                  } catch (error) {
+                      alert("Error parsing JSON configuration file.");
+                  }
+              };
+              reader.readAsText(file);
+              event.target.value = null; 
+          };
+
+          // --- State Handlers ---
+          const updateClock = (updates) => setClock({ ...clock, ...updates });
+          const updateSignal = (id, updates) => setSignals(signals.map(s => s.id === id ? { ...s, ...updates } : s));
+          
+          const handleClockParamChange = (updates) => {
+              const nextClock = { ...clock, ...updates };
+              
+              // Clamp duty cycle to prevent division by zero anomalies
+              if (nextClock.duty <= 0) nextClock.duty = 0.1;
+              if (nextClock.duty >= 100) nextClock.duty = 99.9;
+              
+              let T_current = nextClock.freqMHz > 0 ? 1000 / nextClock.freqMHz : 0;
+              const dutyRatio = nextClock.duty / 100;
+              
+              // Ensure period is mathematically large enough to accommodate the physical rise/fall edges at this duty cycle
+              const minTForOn = (nextClock.rise/2 + nextClock.fall/2) / dutyRatio;
+              const minTForOff = (nextClock.rise/2 + nextClock.fall/2) / (1 - dutyRatio);
+              const minRequiredT = Math.max(nextClock.rise + nextClock.fall, minTForOn, minTForOff);
+              
+              if (T_current < minRequiredT && minRequiredT > 0) {
+                  nextClock.freqMHz = 1000 / minRequiredT;
+              }
+              
+              updateClock(nextClock);
+          };
+
+          // MinON / MinOFF syncing logic
+          const T_current = clock.freqMHz > 0 ? 1000 / clock.freqMHz : 0;
+          const currentMinOn = Math.max(0, (T_current * (clock.duty / 100)) - clock.rise/2 - clock.fall/2);
+          const currentMinOff = Math.max(0, (T_current * (1 - (clock.duty / 100))) - clock.rise/2 - clock.fall/2);
+
+          const updateMinOn = (newMinOn) => {
+              const tLow = T_current * (1 - (clock.duty / 100));
+              const newTHigh = newMinOn + clock.rise/2 + clock.fall/2;
+              const newT = newTHigh + tLow;
+              if (newT > 0) updateClock({ freqMHz: 1000 / newT, duty: (newTHigh / newT) * 100 });
+          };
+
+          const updateMinOff = (newMinOff) => {
+              const tHigh = T_current * (clock.duty / 100);
+              const newTLow = newMinOff + clock.rise/2 + clock.fall/2;
+              const newT = tHigh + newTLow;
+              if (newT > 0) updateClock({ freqMHz: 1000 / newT, duty: (tHigh / newT) * 100 });
+          };
+
+          const addSignal = () => {
+            setSignals([...signals, {
+              id: `sig_${Date.now()}`, name: `New Signal`, direction: 'TX', rxClockFlight: 0,
+              tx: { launchEdge: 'RISING', tco: 1.0, jitter: 0.1, rise: 0.5, fall: 0.5 }, 
+              path: [], 
+              rx: { captureEdge: 'RISING', setup: 1.0, hold: 0.5 }, 
+              pattern: 'x10x'
+            }]);
+          };
+          const removeSignal = (id) => setSignals(signals.filter(s => s.id !== id));
+
+          const addPathElement = (sigId, type) => {
+            setSignals(signals.map(s => {
+              if (s.id !== sigId) return s;
+              const newElement = type === 'PCB' 
+                ? { id: `path_${Date.now()}`, type: 'PCB', delay: 0.5 }
+                : { id: `path_${Date.now()}`, type: 'XCVR', name: 'Buffer', tpd: 1.0, jitter: 0.1, skew: 0.1 };
+              return { ...s, path: [...s.path, newElement] };
+            }));
+          };
+          const updatePathElement = (sigId, pathId, updates) => setSignals(signals.map(s => s.id !== sigId ? s : { ...s, path: s.path.map(p => p.id === pathId ? { ...p, ...updates } : p) }));
+          const removePathElement = (sigId, pathId) => setSignals(signals.map(s => s.id !== sigId ? s : { ...s, path: s.path.filter(p => p.id !== pathId) }));
+
+          const applyToOthers = (sourceId) => {
+            const sourceSig = signals.find(s => s.id === sourceId);
+            if(!sourceSig) return;
+            setSignals(signals.map(s => s.id === sourceId ? s : { ...s, tx: JSON.parse(JSON.stringify(sourceSig.tx)), rx: JSON.parse(JSON.stringify(sourceSig.rx)), path: JSON.parse(JSON.stringify(sourceSig.path)), direction: sourceSig.direction, pattern: sourceSig.pattern, rxClockFlight: sourceSig.rxClockFlight }));
+          };
+
+          const applyToNext = (sourceId) => {
+            const sourceSig = signals.find(s => s.id === sourceId);
+            const sourceIdx = signals.findIndex(s => s.id === sourceId);
+            if(!sourceSig || sourceIdx === -1) return;
+            setSignals(signals.map((s, idx) => idx <= sourceIdx ? s : { ...s, tx: JSON.parse(JSON.stringify(sourceSig.tx)), rx: JSON.parse(JSON.stringify(sourceSig.rx)), path: JSON.parse(JSON.stringify(sourceSig.path)), direction: sourceSig.direction, pattern: sourceSig.pattern, rxClockFlight: sourceSig.rxClockFlight }));
+          };
+
+          // --- Math & Analysis Engine ---
+          const analysis = useMemo(() => {
+            const T = clock.freqMHz > 0 ? 1000 / clock.freqMHz : 0;
+            const cRise = Number(clock.rise) || 0;
+            const cFall = Number(clock.fall) || 0;
+            
+            // Ideal pulse widths
+            const tHighIdeal = T * (clock.duty / 100);
+            const tLowIdeal  = T * (1 - (clock.duty / 100));
+
+            let maxFeasiblePeriod = cRise + cFall;
+            const signalAnalyses = [];
+            let hasHoldViolations = false;
+            let hasSetupViolations = false;
+
+            signals.forEach(s => {
+              let tAvailable = T; 
+              let launch = s.tx.launchEdge || 'RISING';
+              let capture = s.rx.captureEdge || 'RISING';
+
+              if (launch === 'BOTH' || capture === 'BOTH') {
+                tAvailable = Math.min(tHighIdeal, tLowIdeal);
+              } else if (launch === 'RISING' && capture === 'FALLING') {
+                tAvailable = tHighIdeal;
+              } else if (launch === 'FALLING' && capture === 'RISING') {
+                tAvailable = tLowIdeal;
+              } // else (R->R or F->F) tAvailable = T
+
+              // Calculate Next Launch Edge Shift for Hold Margin
+              let holdShift = 0;
+              if (launch === 'RISING' && capture === 'FALLING') {
+                  holdShift = tLowIdeal;
+              } else if (launch === 'FALLING' && capture === 'RISING') {
+                  holdShift = tHighIdeal;
+              }
+
+              let pathDelay = 0, pathJitter = 0, pathSkew = 0;
+              s.path.forEach(p => {
+                if (p.type === 'PCB') { pathDelay += (Number(p.delay) || 0); } 
+                else if (p.type === 'XCVR') {
+                  pathDelay += (Number(p.tpd) || 0);
+                  pathJitter += (Number(p.jitter) || 0);
+                  pathSkew += Math.abs(Number(p.skew) || 0);
+                }
+              });
+
+              // RX signals include clock flight time to device
+              const clkFlightToDevice = s.direction === 'RX' ? (Number(s.rxClockFlight) || 0) : 0;
+
+              const totalDelay = clkFlightToDevice + (Number(s.tx.tco) || 0) + pathDelay;
+              
+              // Uncertainty uses ± Peak deviation (p-p / 2)
+              const totalUncertainty = ((Number(clock.jitter) || 0) / 2) + ((Number(s.tx.jitter) || 0) / 2) + (pathJitter / 2) + pathSkew;
+              const worstEdge = Math.max((Number(s.tx.rise) || 0), (Number(s.tx.fall) || 0));
+
+              const requiredAvailableTimeForSetup = (Number(s.rx.setup) || 0) + totalDelay + totalUncertainty + worstEdge;
+              
+              let reqPeriodMultiplier = 1;
+              if (launch === 'BOTH' || capture === 'BOTH') reqPeriodMultiplier = 1 / Math.min(clock.duty/100, 1 - clock.duty/100);
+              else if (launch === 'RISING' && capture === 'FALLING') reqPeriodMultiplier = 1 / (clock.duty/100);
+              else if (launch === 'FALLING' && capture === 'RISING') reqPeriodMultiplier = 1 / (1 - clock.duty/100);
+
+              const requiredPeriod = requiredAvailableTimeForSetup * reqPeriodMultiplier;
+              if (requiredPeriod > maxFeasiblePeriod) maxFeasiblePeriod = requiredPeriod;
+
+              const setupMargin = tAvailable - requiredAvailableTimeForSetup;
+              const setupViolation = setupMargin < 0;
+              if (setupViolation) hasSetupViolations = true;
+
+              const holdMargin = holdShift + totalDelay - (Number(s.rx.hold) || 0) - totalUncertainty;
+              const holdViolation = holdMargin < 0;
+              if (holdViolation) hasHoldViolations = true;
+
+              // Calculate Margin Percentages
+              const rxHold = Number(s.rx.hold) || 0;
+              const setupPct = requiredAvailableTimeForSetup > 0 ? (setupMargin / requiredAvailableTimeForSetup) * 100 : 0;
+              const holdPct = rxHold > 0 ? (holdMargin / rxHold) * 100 : (holdMargin > 0 ? 999 : -999);
+
+              signalAnalyses.push({ 
+                  ...s, setupMargin, setupViolation, holdMargin, holdViolation, 
+                  totalDelay, totalUncertainty, requiredPeriod, tAvailable, 
+                  reqAvailableTime: requiredAvailableTimeForSetup, rxHold,
+                  setupPct, holdPct, clkFlightToDevice, worstEdge, holdShift
+              });
+            });
+
+            const suggestedPeriod = maxFeasiblePeriod * (1 + (safetyMargin / 100));
+            const suggestedFreq = suggestedPeriod > 0 ? 1000 / suggestedPeriod : 0;
+
+            return { T, tHighIdeal, tLowIdeal, suggestedFreq, signalAnalyses, hasHoldViolations, hasSetupViolations };
+          }, [clock, signals, safetyMargin]);
+
+
+          // --- Waveform Resolution Engine ---
+          const getEdgeTime = (i) => {
+              const cycle = Math.floor(i / 2);
+              const isFalling = (i % 2 === 1);
+              return cycle * analysis.T + (isFalling ? analysis.tHighIdeal : 0);
+          };
+
+          const resolvePattern = (pattern, length) => {
+              const clean = (pattern || '').replace(/\s/g, '');
+              const res = [];
+              let lastState = 'X';
+              for (let i = 0; i < length; i++) {
+                  let char = clean[i] || '.';
+                  if (char === '.') char = lastState;
+                  else if (char === '1' || char.toUpperCase() === 'H') char = 'H';
+                  else if (char === '0' || char.toUpperCase() === 'L') char = 'L';
+                  else if (char.toUpperCase() === 'Z') char = 'Z';
+                  else char = 'X';
+                  res.push(char);
+                  lastState = char;
+              }
+              return res;
+          };
+
+          const getY = (state, type) => {
+              if (state === 'H') return 20;
+              if (state === 'L') return 80;
+              if (state === 'Z') return 50;
+              if (state === 'X') return type === 'top' ? 20 : 80;
+              return 50;
+          };
+
+          // --- Visualization Layout Limits ---
+          const svgParams = useMemo(() => {
+              let maxEdges = 8;
+              if (clock.pattern) maxEdges = Math.max(maxEdges, clock.pattern.replace(/\s/g, '').length);
+              
+              signals.forEach(s => {
+                  const len = (s.pattern || '').replace(/\s/g, '').length;
+                  const isDDR = s.tx.launchEdge === 'BOTH' || s.rx.captureEdge === 'BOTH';
+                  maxEdges = Math.max(maxEdges, len * (isDDR ? 1 : 2));
+              });
+
+              const totalEdges = maxEdges + 2;
+              const VIEW_TIME = getEdgeTime(totalEdges);
+              const SVG_WIDTH = Math.max(900, totalEdges * 40);
+              const TRACK_HEIGHT = 110;
+
+              return { maxEdges, totalEdges, VIEW_TIME, SVG_WIDTH, TRACK_HEIGHT };
+          }, [clock.pattern, signals, analysis.T, analysis.tHighIdeal]);
+
+          const scaleX = (ns) => (ns / svgParams.VIEW_TIME) * (svgParams.SVG_WIDTH - 240); // Leaves 120px margins
+
+          return (
+            <div className="h-screen w-full flex flex-col md:flex-row overflow-hidden">
+              
+              {/* LEFT SIDEBAR: Hardware Configuration */}
+              <div className="w-full md:w-[650px] bg-white border-r border-slate-200 overflow-y-auto h-full flex flex-col shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-slate-200 bg-slate-900 text-white sticky top-0 z-20">
+                  <h1 className="text-xl font-bold flex items-center gap-2">
+                    <Activity className="w-6 h-6 text-emerald-400" /> Hardware Signal Analyzer
+                  </h1>
+                  <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+                    Build exact physical data paths (Driver $\rightarrow$ Transceivers $\rightarrow$ Receiver) to verify high-speed timing constraints.
+                  </p>
+                </div>
+
+                {/* Presets, Import/Export & Units */}
+                <div className="p-6 border-b border-slate-200 bg-slate-50">
+                    <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2"><Zap className="w-4 h-4" /> Protocol Presets</h2>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {Object.keys(PRESETS).map(key => (
+                        <button key={key} onClick={() => loadPreset(key)} className="text-xs font-semibold bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-md hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition shadow-sm">{key}</button>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-between items-center mb-3 mt-4">
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2"><Save className="w-4 h-4" /> Import / Export Config</h2>
+                    </div>
+                    <div className="flex gap-2 mb-6">
+                        <button onClick={exportConfig} className="text-xs font-semibold bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-md hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition shadow-sm flex items-center gap-1">
+                            <Download className="w-3 h-3" /> Export to File
+                        </button>
+                        <label className="text-xs font-semibold bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded-md hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition shadow-sm flex items-center gap-1 cursor-pointer">
+                            <Upload className="w-3 h-3" /> Import from File
+                            <input type="file" accept=".json" className="hidden" onChange={importConfig} />
+                        </label>
+                    </div>
+
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 mb-2 border-t border-slate-200 pt-4">Display Units</h2>
+                    <div className="flex gap-4">
+                        <div className="flex bg-slate-200 rounded-lg p-1">
+                            <button onClick={() => setFreqUnit('MHz')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${freqUnit === 'MHz' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>MHz</button>
+                            <button onClick={() => setFreqUnit('kHz')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${freqUnit === 'kHz' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>kHz</button>
+                        </div>
+                        <div className="flex bg-slate-200 rounded-lg p-1">
+                            <button onClick={() => setTimeUnit('ns')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${timeUnit === 'ns' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>ns</button>
+                            <button onClick={() => setTimeUnit('us')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${timeUnit === 'us' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>us</button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* System Clock */}
+                <div className="p-6 border-b border-slate-200 bg-slate-50">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2 mb-4">
+                    <ClockIcon className="w-4 h-4" /> System Clock Source
+                  </h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <NumInput label="Frequency" unit={freqUnit} value={clock.freqMHz * fMult} onChange={(v) => handleClockParamChange({ freqMHz: v / fMult })} />
+                    <NumInput label="Duty Cycle" unit="%" value={clock.duty} onChange={(v) => handleClockParamChange({ duty: v })} />
+                    <NumInput label="Min ON" unit={timeUnit} value={currentMinOn * tMult} onChange={(v) => updateMinOn(v / tMult)} className="bg-emerald-50/50" />
+                    <NumInput label="Min OFF" unit={timeUnit} value={currentMinOff * tMult} onChange={(v) => updateMinOff(v / tMult)} className="bg-emerald-50/50" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mb-4 border-t border-slate-200 pt-4">
+                    <NumInput label="Jitter (p-p)" unit={timeUnit} value={clock.jitter * tMult} onChange={(v) => updateClock({ jitter: v / tMult })} />
+                    <NumInput label="Rise Time" unit={timeUnit} value={clock.rise * tMult} onChange={(v) => handleClockParamChange({ rise: v / tMult })} />
+                    <NumInput label="Fall Time" unit={timeUnit} value={clock.fall * tMult} onChange={(v) => handleClockParamChange({ fall: v / tMult })} />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Custom Clock Pattern (1 char = Half Period)</label>
+                    <input 
+                        type="text" value={clock.pattern} onChange={(e) => updateClock({ pattern: e.target.value })}
+                        placeholder="e.g., 10101010 (Leave blank for auto-toggling)"
+                        className="w-full border border-slate-300 bg-white rounded px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Signal Path Builder */}
+                <div className="p-6 bg-slate-200/50 flex-1">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                      <Cpu className="w-4 h-4" /> Hardware Signal Paths
+                    </h2>
+                    <button onClick={addSignal} className="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg shadow hover:bg-blue-700 transition">
+                      + Add Signal Path
+                    </button>
+                  </div>
+
+                  <div className="space-y-6 pb-12">
+                    {signals.map((sig, idx) => {
+                      const isTX = sig.direction === 'TX';
+                      
+                      return (
+                        <div key={sig.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                          
+                          {/* Signal Header */}
+                          <div className={`px-4 py-3 border-b flex flex-col justify-between items-start gap-2 ${isTX ? 'bg-blue-50/50 border-blue-100' : 'bg-purple-50/50 border-purple-100'}`}>
+                            <div className="flex justify-between w-full items-center">
+                                <div className="flex items-center gap-3 w-full">
+                                    <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shrink-0 ${isTX ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                        {isTX ? <ArrowRight className="w-3 h-3" /> : <ArrowLeft className="w-3 h-3" />} {isTX ? 'TX (Out)' : 'RX (In)'}
+                                    </span>
+                                    <input 
+                                        value={sig.name} onChange={(e) => updateSignal(sig.id, { name: e.target.value })}
+                                        className="font-bold bg-transparent border-none outline-none text-slate-800 w-full placeholder-slate-400"
+                                        placeholder="Signal Name (e.g., MOSI)"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <select 
+                                        value={sig.direction} onChange={(e) => updateSignal(sig.id, { direction: e.target.value })}
+                                        className="text-xs font-bold bg-white border border-slate-300 rounded p-1 outline-none text-slate-600 cursor-pointer"
+                                    >
+                                        <option value="TX">Host is TX</option>
+                                        <option value="RX">Host is RX</option>
+                                    </select>
+                                    <button onClick={() => removeSignal(sig.id)} className="text-slate-400 hover:text-rose-500 transition p-1"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+                            
+                            {/* Duplication Controls */}
+                            {signals.length > 1 && (
+                                <div className="flex gap-2 mt-1 pl-[90px]">
+                                    <button onClick={() => applyToOthers(sig.id)} title="Copy entire setup to all other signals" className="text-[10px] font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded transition flex items-center gap-1 shadow-sm">
+                                        <Copy className="w-3 h-3" /> Apply to All Others
+                                    </button>
+                                    <button onClick={() => applyToNext(sig.id)} title="Copy entire setup only to signals below this one" className="text-[10px] font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded transition flex items-center gap-1 shadow-sm">
+                                        <ArrowDown className="w-3 h-3" /> Apply to Next
+                                    </button>
+                                </div>
+                            )}
+                          </div>
+
+                          {/* Data Pattern */}
+                          <div className="px-4 pt-3 pb-1 border-b border-slate-100 bg-slate-50/50">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Bit Pattern (1=High, 0=Low, x=Eye, z=High-Z, .=Hold)</label>
+                            <input 
+                                type="text" value={sig.pattern} onChange={(e) => updateSignal(sig.id, { pattern: e.target.value })}
+                                placeholder="e.g., 10....... or x10101010x"
+                                className="w-full border border-slate-300 bg-white rounded px-3 py-1.5 text-xs focus:border-blue-500 outline-none font-mono"
+                            />
+                          </div>
+
+                          {/* Hardware Block Builder (Directional Layout) */}
+                          <div className={`p-4 bg-slate-50 flex flex-col gap-4 ${isTX ? 'items-start' : 'items-end'}`}>
+                            
+                            {/* 1. Driver/Transmitter */}
+                            <div className={`flex items-stretch gap-4 w-full ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                              <div className={`w-12 flex items-center justify-center border-slate-300 ${isTX ? 'rounded-l-lg border-r-2 bg-blue-100 text-blue-700' : 'rounded-r-lg border-l-2 bg-slate-200 text-slate-600'}`}>
+                                <span className="text-[10px] font-black -rotate-90 uppercase tracking-widest">{isTX ? 'Host' : 'Device'}</span>
+                              </div>
+                              <div className={`flex-1 py-2 flex flex-col ${isTX ? 'items-start' : 'items-end'}`}>
+                                <div className={`flex gap-3 items-center mb-2 ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                                  <h4 className="text-xs font-bold text-slate-700">Driver Specifications</h4>
+                                  <select value={sig.tx.launchEdge} onChange={(e) => updateSignal(sig.id, { tx: {...sig.tx, launchEdge: e.target.value} })} className="text-[10px] font-bold bg-white border border-slate-300 rounded outline-none p-1 text-slate-600">
+                                    <option value="RISING">Launch: Rising Edge</option>
+                                    <option value="FALLING">Launch: Falling Edge</option>
+                                    <option value="BOTH">Launch: DDR (Both)</option>
+                                  </select>
+                                </div>
+                                <div className={`flex flex-wrap gap-2 ${isTX ? 'justify-start' : 'justify-end'}`}>
+                                  {!isTX && <NumInput label="Host Clk Flight Time" unit={timeUnit} value={sig.rxClockFlight * tMult} onChange={(v) => updateSignal(sig.id, { rxClockFlight: v / tMult })} className="bg-amber-50" />}
+                                  <NumInput label="Tco" unit={timeUnit} value={sig.tx.tco * tMult} onChange={(v) => updateSignal(sig.id, { tx: {...sig.tx, tco: v / tMult} })} />
+                                  <NumInput label="Jitter (p-p)" unit={timeUnit} value={sig.tx.jitter * tMult} onChange={(v) => updateSignal(sig.id, { tx: {...sig.tx, jitter: v / tMult} })} />
+                                  <NumInput label="Rise" unit={timeUnit} value={sig.tx.rise * tMult} onChange={(v) => updateSignal(sig.id, { tx: {...sig.tx, rise: v / tMult} })} />
+                                  <NumInput label="Fall" unit={timeUnit} value={sig.tx.fall * tMult} onChange={(v) => updateSignal(sig.id, { tx: {...sig.tx, fall: v / tMult} })} />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 2. Path/Channel */}
+                            <div className={`w-[95%] border-dashed border-slate-300 py-2 flex flex-col gap-3 ${isTX ? 'ml-6 pl-4 border-l-2 items-start self-start' : 'mr-6 pr-4 border-r-2 items-end self-end'}`}>
+                              {sig.path.map((p, pIdx) => (
+                                <div key={p.id} className={`relative group bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex items-center gap-3 ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                                  <button onClick={() => removePathElement(sig.id, p.id)} className={`absolute bg-rose-100 text-rose-600 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition ${isTX ? '-left-[27px]' : '-right-[27px]'}`}><Trash2 className="w-3 h-3" /></button>
+                                  
+                                  {p.type === 'PCB' ? (
+                                    <>
+                                      <div className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">PCB Trace</div>
+                                      <NumInput label="Trace Delay" unit={timeUnit} value={p.delay * tMult} onChange={(v) => updatePathElement(sig.id, p.id, { delay: v / tMult })} className="w-24" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded flex flex-col items-center"><span>XCVR</span></div>
+                                      <input value={p.name} onChange={(e) => updatePathElement(sig.id, p.id, { name: e.target.value })} className={`text-xs font-bold w-24 outline-none border-b focus:border-emerald-500 bg-transparent ${isTX ? 'text-left' : 'text-right'}`} placeholder="Name" />
+                                      <NumInput label="Prop Delay" unit={timeUnit} value={p.tpd * tMult} onChange={(v) => updatePathElement(sig.id, p.id, { tpd: v / tMult })} className="w-20" />
+                                      <NumInput label="Jitter (p-p)" unit={timeUnit} value={p.jitter * tMult} onChange={(v) => updatePathElement(sig.id, p.id, { jitter: v / tMult })} className="w-20" />
+                                      <NumInput label="Skew (±)" unit={timeUnit} value={p.skew * tMult} onChange={(v) => updatePathElement(sig.id, p.id, { skew: v / tMult })} className="w-20" />
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                              
+                              <div className={`flex gap-2 mt-1 ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                                <button onClick={() => addPathElement(sig.id, 'PCB')} className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded transition shadow-sm">+ Add PCB Trace</button>
+                                <button onClick={() => addPathElement(sig.id, 'XCVR')} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded transition shadow-sm">+ Add XCVR</button>
+                              </div>
+                            </div>
+
+                            {/* 3. Receiver */}
+                            <div className={`flex items-stretch gap-4 w-full ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                              <div className={`w-12 flex items-center justify-center border-slate-300 ${isTX ? 'rounded-l-lg border-r-2 bg-slate-200 text-slate-600' : 'rounded-r-lg border-l-2 bg-purple-100 text-purple-700'}`}>
+                                <span className="text-[10px] font-black -rotate-90 uppercase tracking-widest">{isTX ? 'Device' : 'Host'}</span>
+                              </div>
+                              <div className={`flex-1 py-2 flex flex-col ${isTX ? 'items-start' : 'items-end'}`}>
+                                <div className={`flex gap-3 items-center mb-2 ${isTX ? 'flex-row' : 'flex-row-reverse'}`}>
+                                  <h4 className="text-xs font-bold text-slate-700">Receiver Specifications</h4>
+                                  <select value={sig.rx.captureEdge} onChange={(e) => updateSignal(sig.id, { rx: {...sig.rx, captureEdge: e.target.value} })} className="text-[10px] font-bold bg-white border border-slate-300 rounded outline-none p-1 text-slate-600">
+                                    <option value="RISING">Capture: Rising Edge</option>
+                                    <option value="FALLING">Capture: Falling Edge</option>
+                                    <option value="BOTH">Capture: DDR (Both)</option>
+                                  </select>
+                                </div>
+                                <div className={`flex flex-wrap gap-2 ${isTX ? 'justify-start' : 'justify-end'}`}>
+                                  <NumInput label="Setup Req." unit={timeUnit} value={sig.rx.setup * tMult} onChange={(v) => updateSignal(sig.id, { rx: {...sig.rx, setup: v / tMult} })} />
+                                  <NumInput label="Hold Req." unit={timeUnit} value={sig.rx.hold * tMult} onChange={(v) => updateSignal(sig.id, { rx: {...sig.rx, hold: v / tMult} })} />
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT MAIN: Analysis & Visualization */}
+              <div className="flex-1 overflow-y-auto bg-white flex flex-col h-full border-l border-slate-200 shadow-[-4px_0_24px_rgba(0,0,0,0.02)]">
+                
+                {/* Results Banner */}
+                <div className={`p-6 border-b flex flex-col 2xl:flex-row gap-6 justify-between items-start 2xl:items-center transition-colors shadow-sm z-10 sticky top-0 ${(analysis.hasHoldViolations || analysis.hasSetupViolations) ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+                  <div>
+                    <h3 className={`text-xs font-bold tracking-wider mb-1 uppercase ${(analysis.hasHoldViolations || analysis.hasSetupViolations) ? 'text-rose-600' : 'text-slate-500'}`}>
+                      {(analysis.hasHoldViolations || analysis.hasSetupViolations) ? 'Design Unfeasible' : 'Theoretical Max System Frequency'}
+                    </h3>
+                    {(analysis.hasHoldViolations || analysis.hasSetupViolations) ? (
+                      <div className="flex items-center gap-3"><AlertTriangle className="w-8 h-8 text-rose-500" /><span className="text-3xl font-black text-rose-700">FAILING</span></div>
+                    ) : (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-800">{(analysis.suggestedFreq * fMult).toFixed(1)}</span>
+                        <span className="text-lg font-bold text-slate-400">{freqUnit}</span>
+                      </div>
+                    )}
+                    
+                    {!(analysis.hasHoldViolations || analysis.hasSetupViolations) && (
+                      <div className="mt-3 flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-200 w-max shadow-sm">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Safety Margin</label>
+                        <input type="range" min="0" max="100" step="1" value={safetyMargin} onChange={(e) => setSafetyMargin(parseFloat(e.target.value))} className="w-24 accent-emerald-500" />
+                        <span className="text-xs font-bold text-slate-700 w-8">{safetyMargin}%</span>
+                        <div className="h-4 w-px bg-slate-300 mx-2"></div>
+                        <button onClick={() => handleClockParamChange({ freqMHz: analysis.suggestedFreq })} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1">
+                          Apply to Clock <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 w-full 2xl:w-auto">
+                    {analysis.signalAnalyses.map(sa => {
+                      const suPctStr = sa.reqAvailableTime > 0 ? `${sa.setupMargin > 0 ? '+' : ''}${sa.setupPct.toFixed(1)}%` : '';
+                      const hoPctStr = sa.rxHold > 0 ? `${sa.holdMargin > 0 ? '+' : ''}${sa.holdPct.toFixed(1)}%` : (sa.holdMargin > 0 ? '+∞%' : '-∞%');
+
+                      return (
+                        <div key={sa.id} className="flex flex-col gap-1">
+                          {sa.holdViolation && <div className="bg-white border border-rose-300 text-rose-700 px-3 py-2 rounded-md shadow-sm flex items-center gap-2 text-xs w-full max-w-md"><AlertTriangle className="w-4 h-4 shrink-0" /><span><strong>Hold Violation on {sa.name}:</strong> Margin is {(sa.holdMargin * tMult).toFixed(2)}{timeUnit} ({hoPctStr}). Fix: Add PCB delay or reduce skew.</span></div>}
+                          {sa.setupViolation && <div className="bg-white border border-rose-300 text-rose-700 px-3 py-2 rounded-md shadow-sm flex items-center gap-2 text-xs w-full max-w-md"><AlertTriangle className="w-4 h-4 shrink-0" /><span><strong>Setup Violation on {sa.name}:</strong> Margin is {(sa.setupMargin * tMult).toFixed(2)}{timeUnit} ({suPctStr}). Fix: Lower clock freq or use faster parts.</span></div>}
+                          {(!sa.holdViolation && !sa.setupViolation) && <div className={`border px-3 py-1.5 rounded-md shadow-sm flex items-center gap-2 text-xs ${(analysis.hasHoldViolations || analysis.hasSetupViolations) ? 'bg-white border-slate-200 text-slate-500' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}><CheckCircle2 className={`w-4 h-4 ${(analysis.hasHoldViolations || analysis.hasSetupViolations) ? 'text-slate-400' : ''}`} /><span><strong>{sa.name} Valid</strong> (Setup Margin: {(sa.setupMargin * tMult).toFixed(2)}{timeUnit} [{suPctStr}] | Hold Margin: {(sa.holdMargin * tMult).toFixed(2)}{timeUnit} [{hoPctStr}])</span></div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Hardware Block Diagram & Timing Visualization */}
+                <div className="p-6 md:p-8 flex flex-col shrink-0">
+                  
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-4 mb-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-purple-200 border border-purple-400 rounded-sm"></div> Jitter + Skew Uncertainty</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-amber-100 border border-amber-300 rounded-sm"></div> Setup Requirement Zone</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-rose-100 border border-rose-300 rounded-sm"></div> Hold Requirement Zone</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-50 border border-blue-400 rounded-sm"></div> Stable Valid Data (H/L)</div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto p-8 custom-scrollbar">
+                    <svg width={svgParams.SVG_WIDTH} height={(1 + signals.length) * svgParams.TRACK_HEIGHT + 40} className="mx-auto block" style={{ minWidth: `${svgParams.SVG_WIDTH}px` }}>
+                      
+                      {/* X-Axis Grid */}
+                      <g className="text-[10px] fill-slate-400">
+                        {Array.from({length: Math.ceil(svgParams.totalEdges/2) + 1}, (_, i) => {
+                          const t = i * analysis.T;
+                          const x = scaleX(t);
+                          return (
+                            <g key={i} transform="translate(120, 0)">
+                              <line x1={x} y1={0} x2={x} y2="100%" className="stroke-slate-100 stroke-2" strokeDasharray="4 4" />
+                              <text x={x + 5} y={15}>{(t * tMult).toFixed(1)}{timeUnit}</text>
+                            </g>
+                          );
+                        })}
+                      </g>
+
+                      {/* Render Clock */}
+                      <g transform={`translate(0, 30)`}>
+                        <text x="0" y="50" className="text-sm font-bold fill-slate-800">System Clock</text>
+                        <text x="0" y="65" className="text-[10px] fill-slate-500">{(clock.freqMHz * fMult).toFixed(1)} {freqUnit} {clock.pattern ? '(Custom Pattern)' : ''}</text>
+                        
+                        <line x1="120" y1="20" x2={svgParams.SVG_WIDTH - 120} y2="20" className="stroke-slate-100" />
+                        <line x1="120" y1="80" x2={svgParams.SVG_WIDTH - 120} y2="80" className="stroke-slate-100" />
+                        
+                        <g transform="translate(120, 0)">
+                          {(() => {
+                            let pathTop = "";
+                            let pathBot = "";
+                            const clockRects = [];
+                            
+                            const clkStates = clock.pattern 
+                                ? resolvePattern(clock.pattern, svgParams.totalEdges)
+                                : Array.from({length: svgParams.totalEdges}, (_, i) => i % 2 === 0 ? 'H' : 'L');
+                                
+                            let lastState = clkStates[0] || 'X';
+                            pathTop += `M 0 ${getY(lastState, 'top')} `;
+                            pathBot += `M 0 ${getY(lastState, 'bot')} `;
+
+                            for (let i = 0; i < svgParams.totalEdges; i++) {
+                              const state = clkStates[i];
+                              const tStart = getEdgeTime(i);
+                              const tEnd = getEdgeTime(i+1);
+                              
+                              const isRising = (lastState === 'L' && state === 'H');
+                              const isFalling = (lastState === 'H' && state === 'L');
+                              const edgeW = isRising ? clock.rise : (isFalling ? clock.fall : 0);
+
+                              const xStart = scaleX(tStart);
+                              const xTransEnd = scaleX(Math.min(tStart + edgeW, tEnd));
+                              const xEnd = scaleX(tEnd);
+
+                              if (clock.jitter > 0 && (state !== lastState)) {
+                                  clockRects.push(<rect key={`cj_${i}`} x={scaleX(Math.max(0, tStart + edgeW/2 - clock.jitter/2))} y="15" width={scaleX(clock.jitter)} height="70" className="fill-purple-500 opacity-20" />);
+                              }
+
+                              const yTop = getY(state, 'top');
+                              const yBot = getY(state, 'bot');
+                              const pYTop = getY(lastState, 'top');
+                              const pYBot = getY(lastState, 'bot');
+
+                              if (state !== lastState) {
+                                  pathTop += `L ${xStart} ${pYTop} L ${xTransEnd} ${yTop} `;
+                                  pathBot += `L ${xStart} ${pYBot} L ${xTransEnd} ${yBot} `;
+                              } else {
+                                  pathTop += `L ${xStart} ${yTop} L ${xTransEnd} ${yTop} `;
+                                  pathBot += `L ${xStart} ${yBot} L ${xTransEnd} ${yBot} `;
+                              }
+
+                              pathTop += `L ${xEnd} ${yTop} `;
+                              pathBot += `L ${xEnd} ${yBot} `;
+                              lastState = state;
+                            }
+                            
+                            return (
+                              <g>
+                                {clockRects}
+                                <path d={pathTop} fill="none" className="stroke-slate-800 stroke-[2.5px]" strokeLinejoin="round" />
+                                <path d={pathBot} fill="none" className="stroke-slate-800 stroke-[2.5px]" strokeLinejoin="round" />
+                              </g>
+                            );
+                          })()}
+                        </g>
+                      </g>
+
+                      {/* Render Signals */}
+                      {signals.map((sig, idx) => {
+                        const sa = analysis.signalAnalyses.find(x => x.id === sig.id);
+                        const yOffset = 30 + ((1 + idx) * svgParams.TRACK_HEIGHT);
+                        const isTX = sig.direction === 'TX';
+                        
+                        return (
+                          <g key={sig.id} transform={`translate(0, ${yOffset})`}>
+                            {/* Directional Labels based on TX/RX */}
+                            <text x={isTX ? "0" : svgParams.SVG_WIDTH} y="45" textAnchor={isTX ? "start" : "end"} className="text-sm font-bold fill-blue-700">{sig.name}</text>
+                            <text x={isTX ? "0" : svgParams.SVG_WIDTH} y="60" textAnchor={isTX ? "start" : "end"} className="text-[10px] fill-slate-400">
+                              {isTX ? 'Host \u2192 Dev' : 'Dev \u2192 Host'} | L:{sig.tx.launchEdge.charAt(0)} C:{sig.rx.captureEdge.charAt(0)}
+                            </text>
+                            
+                            <line x1="120" y1="20" x2={svgParams.SVG_WIDTH - 120} y2="20" className="stroke-slate-100" />
+                            <line x1="120" y1="80" x2={svgParams.SVG_WIDTH - 120} y2="80" className="stroke-slate-100" />
+
+                            <g transform="translate(120, 0)">
+                              {(() => {
+                                const elements = [];
+                                let pathTop = "";
+                                let pathBot = "";
+                                
+                                const isDDRLaunch = sig.tx.launchEdge === 'BOTH';
+                                const uiCount = Math.floor(svgParams.totalEdges / (isDDRLaunch ? 1 : 2));
+                                const sigStates = resolvePattern(sig.pattern || 'xxxxxx', uiCount);
+                                
+                                let lastState = sigStates[0] || 'X';
+                                pathTop += `M 0 ${getY(lastState, 'top')} `;
+                                pathBot += `M 0 ${getY(lastState, 'bot')} `;
+
+                                for (let ui = 0; ui < uiCount; ui++) {
+                                  const state = sigStates[ui];
+                                  
+                                  // Calculate specific launch and capture edges mathematically
+                                  let startEdgeIdx;
+                                  if (sig.tx.launchEdge === 'BOTH') startEdgeIdx = ui;
+                                  else if (sig.tx.launchEdge === 'FALLING') startEdgeIdx = ui * 2 + 1;
+                                  else startEdgeIdx = ui * 2;
+
+                                  let endEdgeIdx;
+                                  if (sig.rx.captureEdge === 'BOTH') endEdgeIdx = startEdgeIdx + 1;
+                                  else if (sig.rx.captureEdge === 'RISING') endEdgeIdx = startEdgeIdx % 2 === 0 ? startEdgeIdx + 2 : startEdgeIdx + 1;
+                                  else endEdgeIdx = startEdgeIdx % 2 === 0 ? startEdgeIdx + 1 : startEdgeIdx + 2;
+                                  
+                                  const tLaunch = getEdgeTime(startEdgeIdx);
+                                  const tCapture = getEdgeTime(endEdgeIdx);
+                                  
+                                  const tStart = tLaunch + sa.totalDelay;
+                                  const tEnd = tCapture + sa.totalDelay; // Approximate visualization width for holding
+                                  
+                                  const isRising = (lastState === 'L' && state === 'H') || (lastState === 'X' && state === 'H');
+                                  const isFalling = (lastState === 'H' && state === 'L') || (lastState === 'X' && state === 'L');
+                                  const edgeW = isRising ? sig.tx.rise : (isFalling ? sig.tx.fall : Math.max(sig.tx.rise, sig.tx.fall));
+
+                                  const xStart = scaleX(tStart);
+                                  const xTransEnd = scaleX(Math.min(tStart + edgeW, tEnd));
+                                  const xEnd = scaleX(tEnd);
+
+                                  const yTop = getY(state, 'top');
+                                  const yBot = getY(state, 'bot');
+                                  const pYTop = getY(lastState, 'top');
+                                  const pYBot = getY(lastState, 'bot');
+
+                                  // Draw Transitions
+                                  if (state !== lastState || state === 'X') {
+                                      pathTop += `L ${xStart} ${pYTop} L ${xTransEnd} ${yTop} `;
+                                      pathBot += `L ${xStart} ${pYBot} L ${xTransEnd} ${yBot} `;
+                                      if (state === 'X' || lastState === 'X') {
+                                          elements.push(<line key={`cx_${ui}`} x1={xStart} y1={pYBot} x2={xTransEnd} y2={yTop} className="stroke-blue-600 stroke-[2.5px] opacity-80" />);
+                                          elements.push(<line key={`cx2_${ui}`} x1={xStart} y1={pYTop} x2={xTransEnd} y2={yBot} className="stroke-blue-600 stroke-[2.5px] opacity-80" />);
+                                      }
+                                  } else {
+                                      pathTop += `L ${xStart} ${yTop} L ${xTransEnd} ${yTop} `;
+                                      pathBot += `L ${xStart} ${yBot} L ${xTransEnd} ${yBot} `;
+                                  }
+                                  
+                                  pathTop += `L ${xEnd} ${yTop} `;
+                                  pathBot += `L ${xEnd} ${yBot} `;
+
+                                  // Background Eye Fills
+                                  if (state === 'H' || state === 'L') {
+                                      elements.push(<path key={`fill_${ui}`} d={`M ${xTransEnd} 20 L ${xEnd} 20 L ${xEnd} 80 L ${xTransEnd} 80 Z`} className="fill-blue-400 opacity-10" />);
+                                  }
+                                  
+                                  // Jitter & Margins relative to the explicit Capture Edge
+                                  elements.push(<rect key={`jitt_${ui}`} x={scaleX(Math.max(0, tStart - sa.totalUncertainty))} y="15" width={scaleX(edgeW + sa.totalUncertainty * 2)} height="70" className="fill-purple-500 opacity-20" />);
+                                  if (state !== 'Z' && state !== '.') {
+                                      elements.push(<rect key={`su_${ui}`} x={scaleX(tCapture - sig.rx.setup)} y="10" width={scaleX(sig.rx.setup)} height="80" className="fill-amber-400 opacity-20" />);
+                                      elements.push(<rect key={`ho_${ui}`} x={scaleX(tCapture)} y="10" width={scaleX(sig.rx.hold)} height="80" className="fill-rose-500 opacity-20" />);
+                                  }
+
+                                  lastState = state;
+                                }
+
+                                return (
+                                  <g>
+                                    {elements}
+                                    <path d={pathTop} fill="none" className="stroke-blue-600 stroke-[2.5px] opacity-80" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d={pathBot} fill="none" className="stroke-blue-600 stroke-[2.5px] opacity-80" strokeLinecap="round" strokeLinejoin="round" />
+                                  </g>
+                                );
+                              })()}
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Mathematical Breakdown - Rendering ALL signals */}
+                <div className="bg-slate-50 p-6 md:p-8 border-t border-slate-200 shadow-[inset_0_4px_6px_rgba(0,0,0,0.02)] shrink-0">
+                  <h2 className="text-sm font-black text-slate-800 mb-6 uppercase tracking-wider flex items-center gap-2">
+                    <Info className="w-4 h-4 text-blue-500" /> Math Engine Output
+                  </h2>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+                    {signals.map(s => {
+                        const sa = analysis.signalAnalyses.find(x => x.id === s.id);
+                        if(!sa) return null;
+
+                        const suPctStr = sa.reqAvailableTime > 0 ? `(+${sa.setupPct.toFixed(1)}%)` : '';
+                        const hoPctStr = sa.rxHold > 0 ? `(+${sa.holdPct.toFixed(1)}%)` : (sa.holdMargin > 0 ? '(+∞%)' : '');
+                        
+                        return (
+                          <div key={s.id} className="font-mono text-[10px] text-slate-700 bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col gap-3">
+                            <h3 className="font-bold text-sm text-blue-800 border-b border-slate-100 pb-2 mb-1">{s.name}</h3>
+                            
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">1. Path Delay Accumulation</span>
+                              { s.direction === 'RX' && <span>{s.rxClockFlight} (Host Clk Flight) + </span> }
+                              {s.tx.tco} (Tco) + {s.path.length ? s.path.map(p => p.type==='PCB' ? p.delay : p.tpd).join(' + ') : '0'} (Path)<br/>
+                              <span className="font-bold text-blue-700">Total Delay = {(sa.totalDelay * tMult).toFixed(2)} {timeUnit}</span>
+                            </div>
+                            
+                            <div className="h-px bg-slate-100 w-full"></div>
+                            
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">2. Uncertainty Accumulation (± Peak)</span>
+                              ({clock.jitter}p-p/2 Clk) + ({s.tx.jitter}p-p/2 TX) + {s.path.length ? s.path.map(p => p.type==='PCB' ? '0' : `(${p.jitter}p-p/2 + ${p.skew}± Skew) XCVR`).join(' + ') : '0'}<br/>
+                              <span className="font-bold text-purple-700">Total Uncert = {(sa.totalUncertainty * tMult).toFixed(2)} {timeUnit}</span>
+                            </div>
+                            
+                            <div className="h-px bg-slate-100 w-full"></div>
+                            
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">3. Margins against {s.tx.launchEdge.charAt(0)} $\rightarrow$ {s.rx.captureEdge.charAt(0)} Edge</span>
+                              
+                              <div className="mb-2">
+                                Time Avail. (Setup) = {(sa.tAvailable * tMult).toFixed(2)} {timeUnit}<br/>
+                                <div className="pl-2 border-l-2 border-slate-200 my-1 text-[9px] text-slate-500">
+                                  Req. Time = Setup({(Number(s.rx.setup) * tMult).toFixed(2)}) + Delay({(sa.totalDelay * tMult).toFixed(2)}) + Uncert.({(sa.totalUncertainty * tMult).toFixed(2)}) + <span className="text-amber-600 font-bold">Data Edge({(sa.worstEdge * tMult).toFixed(2)})</span><br/>
+                                  Req. Time = {(sa.reqAvailableTime * tMult).toFixed(2)} {timeUnit}
+                                </div>
+                                <span className={`font-bold ${sa.setupViolation ? 'text-rose-600' : 'text-emerald-600'}`}>Setup Margin = {(sa.setupMargin * tMult).toFixed(2)} {timeUnit} {suPctStr}</span>
+                              </div>
+
+                              <div>
+                                <div className="pl-2 border-l-2 border-slate-200 my-1 text-[9px] text-slate-500">
+                                  Hold Margin = {sa.holdShift > 0 ? `Edge Shift(${(sa.holdShift * tMult).toFixed(2)}) + ` : ''}Delay({(sa.totalDelay * tMult).toFixed(2)}) - Hold Req({(Number(s.rx.hold) * tMult).toFixed(2)}) - Uncert.({(sa.totalUncertainty * tMult).toFixed(2)})
+                                </div>
+                                <span className={`font-bold ${sa.holdViolation ? 'text-rose-600' : 'text-emerald-600'}`}>Hold Margin = {(sa.holdMargin * tMult).toFixed(2)} {timeUnit} {hoPctStr}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                    })}
+                  </div>
+
+                  {/* Abstract Engine Explanation */}
+                  <div className="mt-8 pt-8 border-t border-slate-200 grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="font-bold text-slate-700 mb-2 border-b pb-2">Terminology & Concepts</h3>
+                      <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+                        <strong>Time Available (Based on Edge Selection):</strong> The maximum theoretical time allowed for data to travel. Launching on Rising and Capturing on Falling limits the available time to exactly the ideal clock phase (e.g., the HIGH pulse width). For DDR, the available time is the shortest of the HIGH or LOW clock phases.<br/><br/>
+                        <strong>Req. Time Available (Required Time):</strong> The minimum physical time the data <em>actually</em> needs to reliably propagate. It includes the total physical delay (Clock Flight + Tco + Channel), combined jitter/skew penalties, the Receiver's Setup requirement, and the Data's physical rise/fall time.<br/><br/>
+                        <strong>Margins against Edge:</strong> The difference between the theoretical <em>Time Available</em> and the physical <em>Req. Time Available</em>. A positive setup margin means your data arrives with time to spare before the receiver's sampling edge. A positive hold margin means your data stays stable long enough after the sampling edge.
+                      </p>
+                    </div>
+                    <div className="bg-slate-100/50 p-5 rounded-xl border border-slate-200 flex flex-col justify-center">
+                      <h3 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">The Abstract Engine Formulas</h3>
+                      <ul className="text-sm text-slate-700 space-y-3 font-mono">
+                        <li><span className="font-bold text-blue-700">Total Delay</span> = Host Clock Flight Time (RX only) + Tco + &Sigma; Path Delays (PCB + XCVR)</li>
+                        <li><span className="font-bold text-purple-600">Uncertainty (±Peak)</span> = (Jitter_clk_pp / 2) + (Jitter_tx_pp / 2) + &Sigma; (Jitter_xcvr_pp / 2 + Skew_xcvr_±)</li>
+                        <li><span className="font-bold text-amber-600">Req. Time Available</span> = Setup + Total Delay + Uncertainty + max(Data Rise, Data Fall)</li>
+                        <li><span className="font-bold text-blue-600">Setup Margin</span> = Time Available (based on Edge) - Req. Time Available</li>
+                        <li><span className="font-bold text-rose-600">Hold Margin</span> = Next Edge Shift + Total Delay - Hold - Uncertainty</li>
+                      </ul>
+                      <div className="mt-4 text-[10px] text-slate-500 bg-white p-3 rounded border border-slate-200 shadow-sm leading-relaxed">
+                          <strong>*Note on Hold Margin:</strong> If the Capture edge and the subsequent Launch edge are different (e.g. launching on Rising and capturing on Falling), the data does not transition again until the <em>next</em> Launch edge. This provides an inherent "Next Edge Shift" (equal to the half-period) that naturally extends the hold margin.<br/><br/>
+                          <strong>*Note on Jitter (p-p):</strong> Jitter is entered as a Peak-to-Peak (p-p) value. Because setup and hold timing analysis calculates the worst-case shift of an edge from its ideal center, the mathematical penalty applied to the margins is the <strong>±Peak deviation</strong>, which is exactly <strong>half</strong> of the p-p value (p-p / 2). Skew is treated as an absolute ± variation and is added directly.
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // --- Shared Components ---
+        function NumInput({ label, value, onChange, className = "", unit = "" }) {
+          const [localVal, setLocalVal] = useState(value);
+
+          useEffect(() => {
+            if (value === '' && localVal !== '') setLocalVal('');
+            else if (value !== '' && parseFloat(localVal) !== value) setLocalVal(value);
+          }, [value]);
+
+          const handleChange = (e) => {
+            const rawStr = e.target.value;
+            setLocalVal(rawStr); 
+            if (rawStr !== '' && !isNaN(rawStr)) onChange(parseFloat(rawStr));
+            else if (rawStr === '') onChange('');
+          };
+
+          return (
+            <div className={`flex flex-col gap-1 ${className} p-2 rounded-lg border border-transparent hover:border-slate-200 transition`}>
+              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex justify-between gap-2">
+                <span className="whitespace-nowrap">{label}</span>
+                <span className="font-medium text-slate-400 normal-case">{unit}</span>
+              </label>
+              <input type="number" step="any" min="0" value={localVal} onChange={handleChange} className="border border-slate-300 bg-white rounded px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition font-mono" />
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</body>
+</html>
